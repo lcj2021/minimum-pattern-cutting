@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <vector>
 #include <unordered_map>
+#include <bitset>
 #include <set>
 #include <string.h>
 #include <string>
@@ -40,6 +41,7 @@ public:
 	void partition(string txt_name, string tag, string out_file);
 	void getFileList(string template_path, string result_path);
 	void readQueryResult(string template_path, string result_path, string tag);
+	void mergeWCC();
 	int getSvCnt();
 	// void update();
 
@@ -57,17 +59,19 @@ private:
 	vector<vector<pair<int, int>>> edge;
 	vector<pair<int, string>> otherEdge;
 
-	//coarseningPoint: singlePre
+	// 
 	vector<unordered_map<int, int>> coarseningPoint;
 
 	// key: entityID		value: the count of triples containing entityID
 	vector<int> entityTriples;
 
+	vector<int> parentVec;
+
 	unordered_map<string, int> edge_cnt; // edge_cnt[IDToPredicate[i]] == edge[i].size()
 
 	// edge_cnt 
 	// key: the property	value: the count of the property
-	unordered_map<string, double> edge_weight;
+	unordered_map<string, int> edge_weight;
 
 	unordered_map<string, int> group;
 	vector<vector<pair<pair<string, string>, string>>> edgeGroup;

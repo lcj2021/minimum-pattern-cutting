@@ -34,6 +34,7 @@
 # directory
 /origin_query
 /warpInput
+/.vscode
 
 # Test data
 MPC_watdiv*.txt

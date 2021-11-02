@@ -1,7 +1,7 @@
 #include "graph.h"
 #include <fstream>
 #include <sstream>
-#include <regex>
+#include <unordered_set>
 #include <time.h>
 
 graph::graph() {}
@@ -29,7 +29,11 @@ int graph::getSvCnt()
 		if (edge_weight[IDToPredicate[i]] == 0)
 			edge_weight[IDToPredicate[i]] = 1;
 	for (int i = preType + 1; i <= svCnt; ++i)
-		edge_weight[IDToPredicate[i]] = 1000;
+	{
+		edge_weight[IDToPredicate[i]] = 10000;
+		cout << i << " : " <<  IDToPredicate[i] << endl;
+	}
+
 	return svCnt;
 }
 
@@ -348,8 +352,7 @@ void graph::unionEdgeForGreed()
 	int optim = 0;
 
 	for (int preID = 1; preID <= svCnt; ++ preID)
-
-		//如果谓词的边规模 < 门槛
+	{
 		if (edge[preID].size() < threshold)
 		{
 			for (int p = 0; p < edge[preID].size(); ++ p)
@@ -370,8 +373,12 @@ void graph::unionEdgeForGreed()
 			choice[preID] = 1;
 			optim++;
 		}
+	}
+	
 	printf("opt: %d\n", optim);
+	
 	greed1(choice, parent, sonCnt, rank, invalid);
+	parentVec = parent;
 
 	int crossEdge = 0;
 	for (int preID = 1; preID <= svCnt; ++ preID)
@@ -380,20 +387,22 @@ void graph::unionEdgeForGreed()
 	printf("crossEdge: %d\n", crossEdge);
 	printf("\n");
 	unionBlock(choice, part);
+	mergeWCC();
 }
 
 void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &curSonCnt, vector<int> &curRank, vector<bool> &invalid)
 {
 	//越小越好
-	int nextMinCost = 1e9;
+	int nextMinCost = 0x3f3f3f3f;
 
 	if (true)
 	{
-		vector<int> nextBestParent;
-		vector<int> nextBestSonCnt;
-		vector<int> nextBestRank;
+		vector<int> nextBestParent(curParent);
+		vector<int> nextBestSonCnt(curSonCnt);
+		vector<int> nextBestRank(curRank);
 		vector<int> nextBestChoice(choice);
 		for (int preID = 1; preID <= svCnt; ++ preID)
+		{
 			//如果 当前谓词作为交叉边 且 当前谓词有效
 			if (choice[preID] == 0 && !invalid[preID])
 			{
@@ -402,14 +411,12 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 				vector<int> nextRank(curRank);
 				int nextBlockNum = 0;
 				bool flag = 0;
-				unordered_map<int, int>::iterator it;
-				unordered_map<int, int> cost;
 				int curMax = -1;
 
 				//同一谓词森林 下 树之间的合并
-				for (it = coarseningPoint[preID].begin(); it != coarseningPoint[preID].end(); ++ it)
+				for (const auto &it : coarseningPoint[preID])
 				{
-					int point = it->first;
+					int point = it.first;
 					int parentA = getParent(point, nextParent), parentB = getParent(getParentMap(point, coarseningPoint[preID]), nextParent);
 					if (nextRank[parentA] < nextRank[parentB])
 						swap(parentA, parentB);
@@ -430,7 +437,8 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 				if (flag)
 					continue;
 
-				double curCost = (double)curMax / edge_weight[IDToPredicate[preID]];
+				// double curCost = (double)curMax / edge_weight[IDToPredicate[preID]];
+				double curCost = curMax / edge_weight[IDToPredicate[preID]];
 				// cout << "cost of ID:" << preID << " " << curCost << endl;
 				// cout << preID << " " << IDToPredicate[preID] << " " << edge_weight[IDToPredicate[preID]] << endl;
 
@@ -450,6 +458,8 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 					// cout << preID << endl;
 				}
 			}
+		}
+
 
 		choice.assign(nextBestChoice.begin(), nextBestChoice.end());
 		curParent.assign(nextBestParent.begin(), nextBestParent.end());
@@ -460,8 +470,38 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 		// cout << endl;
 	}
 
-	if (nextMinCost != 1e9)
+	if (nextMinCost != 0x3f3f3f3f)
+	{
 		greed1(choice, curParent, curSonCnt, curRank, invalid);
+	}
+	
+}
+
+void graph::mergeWCC()
+{
+	long long blockSum = 0;
+	unordered_set<int> pendingWCCOfPattern;
+
+	for (int i = 1; i <= entityCnt; ++ i)
+	{
+		int p = getParent(i, parentVec);
+
+		// if (p is root of )
+
+		// cout << p << endl;
+		// bitset<100> t = containPattern[i];
+		// containPattern[p] |= containPattern[i];
+	}
+
+
+	for (int i = 1; i <= entityCnt; ++ i)
+	{
+		if (i == getParent(i, parentVec))
+			++ blockSum;
+	}
+	
+	// while ()
+	cout << blockSum << endl;
 }
 
 //对cur中的1 计数
@@ -1002,6 +1042,7 @@ void graph::getFileList(string template_path, string result_path)
 	for (auto it : query_template)
 		cout << it << endl;
 	cout << endl;
+	sort(query_result.begin(), query_result.end());
 	for (auto it : query_result)
 		cout << it << endl;
 }

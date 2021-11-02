@@ -42,6 +42,6 @@ int main(int argc, char *argv[])
 }
 // g++ main.cpp -std=c++11 -o mpc2
 // .\mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8 ./origin_query ./warpInput/100k
-// ./mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8  ./origin_query ./warpInput/100k
+// ./mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8 ./origin_query ./warpInput/100k
 // ./mpc2 watdiv100M.txt MPC_watdiv100M_data 2 8 ./origin_query ./warpInput/100m
 // ./mpc2 watdiv100M MPC_watdiv100M_data 2 8
