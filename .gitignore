@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# directory
+/origin_query
+/warpInput
+
+# Test data
+MPC_watdiv*.txt
+*.nt
