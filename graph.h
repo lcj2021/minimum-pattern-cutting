@@ -59,6 +59,8 @@ private:
 	vector<vector<pair<int, int>>> edge;
 	vector<pair<int, string>> otherEdge;
 
+	vector<bitset<32>> containPattern;
+
 	// 
 	vector<unordered_map<int, int>> coarseningPoint;
 

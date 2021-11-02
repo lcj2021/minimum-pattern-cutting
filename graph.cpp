@@ -118,6 +118,7 @@ void graph::loadGraph(string txt_name, string tag)
 
 	// for (int i = 1; i <= preType; ++ i)
 	// 	printf("sizeof edge_cnt[%d] : %ld\n", i, edge_cnt[IDToPredicate[i]]);
+	containPattern = vector<bitset<32>>(entityCnt + 1);
 }
 
 //在line中由标签tag 分割出 entity
@@ -374,7 +375,7 @@ void graph::unionEdgeForGreed()
 			optim++;
 		}
 	}
-	
+
 	printf("opt: %d\n", optim);
 	
 	greed1(choice, parent, sonCnt, rank, invalid);
