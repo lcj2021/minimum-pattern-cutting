@@ -1,7 +1,10 @@
-#include "graph.cpp"
+#include "graph.h"
+// #include "Utils.h"
 #include <ctime>
 clock_t st, ed;
 double endtime;
+
+//[0]./mpc2 [1]rdf_path  [2]output_prefix [3]tag [4]k [5]pattern_template [6]pattern_result
 int main(int argc, char *argv[])
 {
 	string rdf_name = argv[1];
@@ -30,8 +33,7 @@ int main(int argc, char *argv[])
 			test->unionEdgeForGreed();
 		else
 			test->greed3();
-
-		// test -> partition(rdf_name, sign, name);
+		test -> partition(rdf_name, sign, name);
 
 	ed = clock();
 	endtime = (double)(ed - st) / CLOCKS_PER_SEC;
@@ -40,8 +42,13 @@ int main(int argc, char *argv[])
 	delete test;
 	return 0;
 }
-// g++ main.cpp -std=c++11 -o mpc2
-// .\mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8 ./origin_query ./warpInput/100k
-// ./mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8 ./origin_query ./warpInput/100k
-// ./mpc2 watdiv100M.txt MPC_watdiv100M_data 2 8 ./origin_query ./warpInput/100m
-// ./mpc2 watdiv100M MPC_watdiv100M_data 2 8
+// 编译:g++ main.cpp -std=c++11 -o mpc2
+// ./mpc2 watdiv100K.nt MPC_watdiv100K_data 2 8 ./origin_query/watdiv_query/official ./warpInput/watdiv100k_result > watdiv_100K_result.txt
+// ./mpc2 watdiv100M.txt MPC_watdiv100M_data 2 8 ./origin_query/watdiv_query/official ./warpInput/watdiv100m_result
+
+// ./mpc2 watdiv100M.txt MPC_watdiv100M_data 2 8 ./origin_query/watdiv_query/round0 ./warpInput/100M/round0_result/ > watdiv_100M_result.txt
+// ./mpc2 watdiv1B.nt MPC_watdiv1B_data 2 8 ./origin_query/watdiv_query/round0 ./warpInput/round0_result > watdiv_1B_result.txt
+
+// nohup ./mpc2 dbpedia2014.nt dbpedia2014_data 1 8 ./origin_query/dbpedia_query ./warpInput/1B/dbpedia2014_result > dbpedia2014_result.txt &
+// ./mpc2 dataset/dbpedia2014_10M.nt dbpedia2014_10M_data 1 8 ./origin_query/dbpedia_query ./warpInput/1B/dbpedia2014_result
+// ./mpc2 dbpedia2014_100K.nt dbpedia2014_100K_data 1 8 ./origin_query/dbpedia_query ./warpInput/1B/dbpedia2014_result > dbpedia2014_100K_result.txt

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <time.h>
+#include "Utils.h"
 
 graph::graph() {}
 
@@ -10,11 +11,9 @@ graph::~graph() {}
 
 void graph::init()
 {
-	//边集
 	vector<pair<int, int>> tmp;
 	edge.push_back(tmp);
 
-	//三元组
 	entityTriples.push_back(0);
 
 	IDToEntity.push_back("");
@@ -26,12 +25,13 @@ int graph::getSvCnt()
 {
 	svCnt = preType + validResultCnt;
 	for (int i = 1; i <= preType; ++i)
-		if (edge_weight[IDToPredicate[i]] == 0)
+		// if (edge_weight[IDToPredicate[i]] == 0 || !edge_weight.count(IDToPredicate[i]))
 			edge_weight[IDToPredicate[i]] = 1;
 	for (int i = preType + 1; i <= svCnt; ++i)
 	{
 		edge_weight[IDToPredicate[i]] = 10000;
-		cout << i << " : " <<  IDToPredicate[i] << endl;
+		cout << i << " : " <<  IDToPredicate[i] << ' ' << edge[i].size() << endl;
+		// cout << predicateToID[IDToPredicate[i]] << " : " << IDToPredicate[i] << endl;
 	}
 
 	return svCnt;
@@ -41,7 +41,7 @@ void graph::loadGraph(string txt_name, string tag)
 {
 	string line;
 	ifstream in1(txt_name);
-
+//	ofstream out("dbpedia2014_100K.nt");
 	vector<pair<int, int>> tmp;
 	cout << txt_name << "========" << endl;
 	while (getline(in1, line))
@@ -51,21 +51,27 @@ void graph::loadGraph(string txt_name, string tag)
 		triples++;
 		line.resize(line.length() - 2);
 		vector<string> s;
-		s = split(line, tag);
+		s = Utils::split(line, tag);
 
-		//＜a, pre, b＞　中间那个就是谓词
 		predicate.insert(s[1]);
 
 		//取a和b,确保在unordered_map中加入映射
 		for (int i = 0; i < 3; i += 2)
+		{
 			//如果s[0] 或 s[2]是 entity 并且 entity - ID 映射中没有
 			if ((s[i][0] == '<' || s[i][0] == '_') && entityToID.count(s[i]) == 0)
 			{
 				entityToID[s[i]] = ++entityCnt;
 				IDToEntity.push_back(s[i]);
-
 				entityTriples.push_back(0);
 			}
+			else if ((s[i][0] == '"') && strEntityToID.count(s[i]) == 0)
+			{
+				strEntityToID[s[i]] = ++strEntityCnt;
+				IDToStrEntity.push_back(s[i]);
+				entityTriples.push_back(0);
+			}
+		}
 
 		edge_cnt[s[1]]++;
 		int a = entityToID[s[0]];
@@ -106,82 +112,18 @@ void graph::loadGraph(string txt_name, string tag)
 	// }
 	// in2.close();
 
-	// for (auto it : edge_weight)
-	// 	cout << it->first << "\t" << predicateToID[it->first] << "\t" << it->second << endl;
-
-	limit = entityCnt / part / 1.2;
+	limit = entityCnt / part / 1;
 	printf("limit: %lld\n", limit);
 	printf("triples: %lld\n", triples);
 	printf("entityCnt: %lld\n", entityCnt);
+	printf("strEntityCnt: %lld\n", strEntityCnt);
 	printf("predicate: %lu\n", predicate.size());
 	printf("entity->preType: %d\n", preType);
+	 
 
 	// for (int i = 1; i <= preType; ++ i)
 	// 	printf("sizeof edge_cnt[%d] : %ld\n", i, edge_cnt[IDToPredicate[i]]);
-	containPattern = vector<bitset<32>>(entityCnt + 1);
-}
-
-//在line中由标签tag 分割出 entity
-vector<string>
-graph::split(string textline, string tag)
-{
-	vector<string> res;
-	std::size_t pre_pos = 0;
-	std::size_t pos = textline.find(tag);
-
-	//依次处理line中的每个tag数据
-	while (pos != std::string::npos)
-	{
-		string curStr = textline.substr(pre_pos, pos - pre_pos);
-		curStr.erase(0, curStr.find_first_not_of("\r\t\n "));
-		curStr.erase(curStr.find_last_not_of("\r\t\n ") + 1);
-
-		if (strcmp(curStr.c_str(), "") != 0)
-			res.push_back(curStr);
-		pre_pos = pos + tag.size();
-		pos = textline.find(tag, pre_pos);
-	}
-
-	string curStr = textline.substr(pre_pos, pos - pre_pos);
-	curStr.erase(0, curStr.find_first_not_of("\r\t\n "));
-	curStr.erase(curStr.find_last_not_of("\r\t\n ") + 1);
-	if (strcmp(curStr.c_str(), "") != 0)
-		res.push_back(curStr);
-
-	return res;
-}
-
-int graph::getParent(int son, vector<int> &fa)
-{
-	// return fa[son]==son?son:fa[son]=getParent(fa[son],fa);
-	int i, j, k;
-	k = son;
-	while (k != fa[k])
-		k = fa[k];
-	i = son;
-	while (i != k)
-	{
-		j = fa[i];
-		fa[i] = k;
-		i = j;
-	}
-	return k;
-}
-
-int graph::getParentMap(int son, unordered_map<int, int> &fa)
-{
-	int i, j, k;
-	k = son;
-	while (k != fa[k])
-		k = fa[k];
-	i = son;
-	while (i != k)
-	{
-		j = fa[i];
-		fa[i] = k;
-		i = j;
-	}
-	return k;
+	// containPattern = vector<bitset<MAX_PROPERTY>>(entityCnt + 1);
 }
 
 void graph::coarsening()
@@ -207,8 +149,8 @@ void graph::coarsening()
 				coarseningPoint[svID].insert(make_pair(B, B));
 
 			//找到 A B 所属 WCC 中 父节点
-			int parentA = getParentMap(A, coarseningPoint[svID]);
-			int parentB = getParentMap(B, coarseningPoint[svID]);
+			int parentA = Utils::Utils::getParentMap(A, coarseningPoint[svID]);
+			int parentB = Utils::Utils::getParentMap(B, coarseningPoint[svID]);
 
 			//令A的color点权重 > B
 			if (rank[parentA] < rank[parentB])
@@ -263,7 +205,7 @@ void graph::unionEdgeForEnum()
 	printf("enumPre\n");
 	enumPre(0, 0, parent, sonCnt, rank, invalidST);
 
-	printf("crossEgdeCnt: %d\n", preType - cal(ans));
+	printf("crossEgdeCnt: %d\n", preType - Utils::count1InBinary(ans));
 	for (int i = 1; i <= preType; ++ i)
 	{
 		//ans记录当前选择
@@ -279,7 +221,7 @@ void graph::unionEdgeForEnum()
 void graph::enumPre(int preID, long long choice, vector<int> &curParent, vector<int> &curSonCnt, vector<int> &curRank, bool *invalidST)
 {
 	//最优剪枝
-	if (cal(ans) >= cal(choice) + preType - preID - invalidEdgeCnt)
+	if (Utils::count1InBinary(ans) >= Utils::count1InBinary(choice) + preType - preID - invalidEdgeCnt)
 		return;
 
 	//边界
@@ -306,7 +248,7 @@ void graph::enumPre(int preID, long long choice, vector<int> &curParent, vector<
 		for (it = coarseningPoint[preID].begin(); it != coarseningPoint[preID].end(); ++ it)
 		{
 			int point = it->first;
-			int parentA = getParent(point, nextFa), parentB = getParent(getParentMap(point, coarseningPoint[preID]), nextFa);
+			int parentA = Utils::getParent(point, nextFa), parentB = Utils::getParent(Utils::Utils::getParentMap(point, coarseningPoint[preID]), nextFa);
 			if (nextRank[parentA] < nextRank[parentB])
 				swap(parentA, parentB);
 			if (parentA != parentB)
@@ -338,6 +280,7 @@ void graph::enumPre(int preID, long long choice, vector<int> &curParent, vector<
 void graph::unionEdgeForGreed()
 {
 	coarsening();
+
 	ans = 0;
 	vector<int> choice(svCnt + 1, 0);
 	vector<int> parent = vector<int>(entityCnt + 1);
@@ -347,7 +290,6 @@ void graph::unionEdgeForGreed()
 	vector<int> rank = vector<int>(entityCnt + 1, 1);
 	printf("greed1\n");
 
-	invalid = vector<bool>(svCnt + 1, 0);
 	int threshold = entityCnt * 0.0001;
 
 	int optim = 0;
@@ -360,7 +302,7 @@ void graph::unionEdgeForGreed()
 			{
 
 				int A = edge[preID][p].first, B = edge[preID][p].second;
-				int parentA = getParent(A, parent), parentB = getParent(B, parent);
+				int parentA = Utils::getParent(A, parent), parentB = Utils::getParent(B, parent);
 
 				if (rank[parentA] < rank[parentB])
 					swap(parentA, parentB);
@@ -377,18 +319,19 @@ void graph::unionEdgeForGreed()
 	}
 
 	printf("opt: %d\n", optim);
-	
+
 	greed1(choice, parent, sonCnt, rank, invalid);
-	parentVec = parent;
+	// WCCParentVec = parent;
+	internalPre = choice;
+	// WCCSizeVec = sonCnt;
 
 	int crossEdge = 0;
 	for (int preID = 1; preID <= svCnt; ++ preID)
-		if (choice[preID] == 0)
+		if (internalPre[preID] == 0)
 			cout << preID << " " << IDToPredicate[preID] << endl, crossEdge++;
 	printf("crossEdge: %d\n", crossEdge);
 	printf("\n");
-	unionBlock(choice, part);
-	mergeWCC();
+	unionBlock(internalPre, part);
 }
 
 void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &curSonCnt, vector<int> &curRank, vector<bool> &invalid)
@@ -418,7 +361,7 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 				for (const auto &it : coarseningPoint[preID])
 				{
 					int point = it.first;
-					int parentA = getParent(point, nextParent), parentB = getParent(getParentMap(point, coarseningPoint[preID]), nextParent);
+					int parentA = Utils::getParent(point, nextParent), parentB = Utils::getParent(Utils::Utils::getParentMap(point, coarseningPoint[preID]), nextParent);
 					if (nextRank[parentA] < nextRank[parentB])
 						swap(parentA, parentB);
 					if (parentA != parentB)
@@ -445,7 +388,7 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 
 				//全部森林中 树的数量
 				for (int p = 1; p <= entityCnt; ++ p)
-					if (getParent(p, nextParent) == p)
+					if (Utils::getParent(p, nextParent) == p)
 						nextBlockNum++;
 
 				if (!nextMinCost || curCost < nextMinCost)
@@ -480,38 +423,87 @@ void graph::greed1(vector<int> &choice, vector<int> &curParent, vector<int> &cur
 
 void graph::mergeWCC()
 {
+	ofstream out("./testOnContainPattern.txt");
 	long long blockSum = 0;
 	unordered_set<int> pendingWCCOfPattern;
+	bitset<MAX_PROPERTY> validPatternMask;
+	validPatternMask.set();
+
+	for (int i = preType + 1; i <= svCnt; ++ i)
+	{
+		if (!internalPre[i])	
+			validPatternMask[i - preType] = 0;
+	}
+	// cout << validPatternMask << endl;
 
 	for (int i = 1; i <= entityCnt; ++ i)
 	{
-		int p = getParent(i, parentVec);
-
-		// if (p is root of )
-
-		// cout << p << endl;
-		// bitset<100> t = containPattern[i];
-		// containPattern[p] |= containPattern[i];
+		containPattern[i] &= validPatternMask;
+		out << containPattern[i] << endl;
 	}
 
-
+	int patternVertexCnt = 0;
 	for (int i = 1; i <= entityCnt; ++ i)
 	{
-		if (i == getParent(i, parentVec))
-			++ blockSum;
+		int p = Utils::getParent(i, WCCParentVec);
+		if (containPattern[p].count() != 0)
+		{
+			// cout << i << endl;
+			++ patternVertexCnt;
+			containPattern[p] = containPattern[i] | containPattern[p];
+			pendingWCCOfPattern.insert(p);
+		}
 	}
-	
-	// while ()
-	cout << blockSum << endl;
-}
+	cout << patternVertexCnt << endl;
 
-//对cur中的1 计数
-int graph::cal(long long cur)
-{
-	int ret = 0;
-	while (cur)
-		ret += (cur & 1), cur >>= 1;
-	return ret;
+	while (pendingWCCOfPattern.size())
+	{
+		puts("=====================================");
+		// compare key: contain pattern cnt, WCC size
+		int selectedRootWCC = *pendingWCCOfPattern.begin();
+		PII selectedRootPII = {containPattern[selectedRootWCC].count(), WCCSizeVec[selectedRootWCC]};
+		for (auto it : pendingWCCOfPattern)
+		{
+			PII currPII = {containPattern[it].count(), WCCSizeVec[it]};
+			if (currPII < selectedRootPII)
+				selectedRootPII = currPII, selectedRootWCC = it;
+		}
+		// cout << selectedWCC << endl;
+		cout << selectedRootPII.first << ' ' << selectedRootPII.second << endl;
+		pendingWCCOfPattern.erase(selectedRootWCC);
+
+		// if (!pendingWCCOfPattern.size())	break;
+
+		while (WCCSizeVec[selectedRootWCC] < limit && pendingWCCOfPattern.size())
+		{
+			// compare key: similarity, size difference
+			int candidateWCC = *pendingWCCOfPattern.begin();
+			PDI candidatePDI = {-(double)(containPattern[candidateWCC] & containPattern[selectedRootWCC]).count() 
+				/ (containPattern[candidateWCC] | containPattern[selectedRootWCC]).count(), 
+				abs(WCCSizeVec[candidateWCC] - WCCSizeVec[selectedRootWCC])};
+			for (auto it : pendingWCCOfPattern)
+			{
+				double similarity = (double)(containPattern[it] & containPattern[selectedRootWCC]).count() 
+				/ (containPattern[it] | containPattern[selectedRootWCC]).count();
+				// cout << containPattern[it] << endl << containPattern[selectedRootWCC] << " : " << similarity << endl;
+				PDI currPDI = {-similarity, abs(WCCSizeVec[it] - WCCSizeVec[selectedRootWCC])};
+				// cout << currPDI.first << ' ' << currPDI.second << endl;
+				if (currPDI < candidatePDI)		
+					candidatePDI = currPDI, candidateWCC = it;
+			}
+			// cout << - candidatePDI.first << ' ' << candidatePDI.second << endl;
+			cout << candidateWCC << ' ' << WCCSizeVec[candidateWCC] << endl;
+
+			if (WCCSizeVec[selectedRootWCC] + WCCSizeVec[candidateWCC] > limit)		break;
+			pendingWCCOfPattern.erase(candidateWCC);
+			WCCSizeVec[selectedRootWCC] += WCCSizeVec[candidateWCC];
+			WCCParentVec[candidateWCC] = WCCParentVec[selectedRootWCC];
+			entityTriples[selectedRootWCC] += entityTriples[candidateWCC];
+		}
+		cout << "final size of " << selectedRootWCC << " is " << WCCSizeVec[selectedRootWCC] << endl;
+		puts("=====================================");
+	}
+	cout << "limit : " << limit << endl;
 }
 
 //最大化内部属性的个数,判断当前选择的内部属性个数是否>现有情况
@@ -526,16 +518,16 @@ void graph::compareCrossingEdgeCnt(long long cur)
 		else
 			cnt += edge[i + 1].size();
 	}
-	if (cal(ans) < c)
+	if (Utils::count1InBinary(ans) < c)
 		ans = cur, crossEgdeCnt = cnt;
-	else if (cal(ans) == c && crossEgdeCnt > cnt)
+	else if (Utils::count1InBinary(ans) == c && crossEgdeCnt > cnt)
 		ans = cur, crossEgdeCnt = cnt;
 }
 
 void graph::greed2()
 {
 	printf("greed2\n");
-	invalid = vector<bool>(preType + 1, 0);
+	invalid = vector<bool>(svCnt + 1, 0);
 	int threshold = entityCnt * 0.0001;
 	vector<int> fa(entityCnt + 1);
 	vector<int> FA(entityCnt + 1);
@@ -547,10 +539,10 @@ void graph::greed2()
 	vector<int> SONCNT(entityCnt + 1, 1);
 
 	//choice is used to determine if a property is selected as internal, 1 means internal
-	vector<int> choice(preType + 1, 0);
+	vector<int> choice(svCnt + 1, 0);
 	vector<pair<int, int>> arr;
 
-	for (int preID = 1; preID <= preType; ++ preID)
+	for (int preID = 1; preID <= svCnt; ++ preID)
 	{
 		//如果preID对应的边集规模小于门槛
 		if (edge_cnt[IDToPredicate[preID]] < threshold)
@@ -560,7 +552,7 @@ void graph::greed2()
 			{
 
 				int A = edge[preID][p].first, B = edge[preID][p].second;
-				int parentA = getParent(A, FA), parentB = getParent(B, FA);
+				int parentA = Utils::getParent(A, FA), parentB = Utils::getParent(B, FA);
 
 				//令A对应color的权重 > B
 				if (RANK[parentA] < RANK[parentB])
@@ -587,7 +579,7 @@ void graph::greed2()
 			{
 
 				int A = edge[preID][p].first, B = edge[preID][p].second;
-				int parentA = getParent(A, parent), parentB = getParent(B, parent);
+				int parentA = Utils::getParent(A, parent), parentB = Utils::getParent(B, parent);
 
 				if (parentA != parentB)
 				{
@@ -613,7 +605,7 @@ void graph::greed2()
 
 			//确定preID森林中 树根的数量
 			for (int p = 1; p <= entityCnt; ++ p)
-				if (getParent(p, parent) == p)
+				if (Utils::getParent(p, parent) == p)
 					SonCntNum++;
 			arr.push_back(make_pair(SonCntNum, preID));
 
@@ -632,7 +624,7 @@ void graph::greed2()
 		{
 
 			int A = edge[preID][p].first, B = edge[preID][p].second;
-			int parentA = getParent(A, FA), parentB = getParent(B, FA);
+			int parentA = Utils::getParent(A, FA), parentB = Utils::getParent(B, FA);
 
 			if (RANK[parentA] < RANK[parentB])
 				swap(parentA, parentB);
@@ -656,7 +648,7 @@ void graph::greed2()
 	}
 
 	int crossEdge = 0;
-	// for(int preID=1;preID<=preType;preID++)
+	// for(int preID=1;preID<=svCnt;preID++)
 	// 	if(choice[preID]==0)cout<<preID<<"	"<<IDToPredicate[preID]<<endl,crossEdge++;
 	printf("crossEdge: %d\n", crossEdge);
 	printf("\n");
@@ -665,35 +657,33 @@ void graph::greed2()
 
 void graph::greed3()
 {
+	puts("\n==========================================================================================\n");
 	printf("greed3\n");
 	invalid = vector<bool>(svCnt + 1, 0);
 	int threshold = entityCnt * 0.0001;
 	vector<int> fa(entityCnt + 1);
 	vector<int> FA(entityCnt + 1);
-	for (int i = 1; i <= entityCnt; ++ i)
+	for (int i = 1; i <= entityCnt; i++)
 		fa[i] = FA[i] = i;
 	vector<int> RANK(entityCnt + 1, 0);
 
 	//SONCNT record the size of each weakly connected component in final result
 	vector<int> SONCNT(entityCnt + 1, 1);
 
-	//choice is used to determine if a property is selected as internal, 1 means internal
 	vector<int> choice(svCnt + 1, 0);
-	vector<pair<double, int>> arr;
+	vector<pair<int, int>> arr;
 
-	for (int preID = 1; preID <= svCnt; ++ preID)
+	// reverse -> make sure multiPres can be chosen
+	for (int preID = svCnt; preID >= 1; -- preID)
 	{
-		//如果preID对应的边集规模小于门槛
-		if (edge[preID].size() < threshold)
+		// if the edge cnt of preID is in smaller than threshold, choose it as internal
+		if (edge_cnt[IDToPredicate[preID]] < threshold)
 		{
-			//枚举preID对应边集的所有边
-			for (int p = 0; p < edge[preID].size(); ++ p)
+			for (int p = 0; p < edge[preID].size(); p++)
 			{
-
 				int A = edge[preID][p].first, B = edge[preID][p].second;
-				int parentA = getParent(A, FA), parentB = getParent(B, FA);
+				int parentA = Utils::getParent(A, FA), parentB = Utils::getParent(B, FA);
 
-				//令A对应color的权重 > B
 				if (RANK[parentA] < RANK[parentB])
 					swap(parentA, parentB);
 				if (parentA != parentB)
@@ -703,31 +693,25 @@ void graph::greed3()
 					RANK[parentA] = max(RANK[parentA], RANK[parentB] + 1);
 				}
 			}
-
-			//把preID这个作为内部属性
 			choice[preID] = 1;
+			internalAddOrder.push_back(preID);
 		}
-		//如果preID对应的边集规模 >= 门槛
 		else
 		{
 			vector<int> parent(fa);
 			vector<int> sonCnt = vector<int>(entityCnt + 1, 1);
 
-			//int MaxCntSize = 0;
-			for (int p = 0; p < edge[preID].size(); ++ p)
+			for (int p = 0; p < edge[preID].size(); p++)
 			{
 
 				int A = edge[preID][p].first, B = edge[preID][p].second;
-				int parentA = getParent(A, parent), parentB = getParent(B, parent);
+				int parentA = Utils::getParent(A, parent), parentB = Utils::getParent(B, parent);
 
 				if (parentA != parentB)
 				{
 					parent[parentB] = parentA;
 					//sonCnt record the size of each weakly connected component in intermediate result
 					sonCnt[parentA] += sonCnt[parentB];
-					//if(sonCnt[parentA]>MaxCntSize){
-					//	MaxCntSize = sonCnt[parentA];
-					//}
 					if (sonCnt[parentA] > limit)
 					{
 						invalid[preID] = 1;
@@ -740,34 +724,24 @@ void graph::greed3()
 				continue;
 
 			//sorting properties by the numbers of weakly connected components
-			int SonCntNum = 0;
-
-			//确定preID森林中 树根的数量
-			for (int p = 1; p <= entityCnt; ++ p)
-				if (getParent(p, parent) == p)
-					SonCntNum++;
-			arr.push_back({SonCntNum * edge_weight[IDToEntity[preID]], preID});
-
-			//arr.push_back(make_pair(MaxCntSize,preID));
+			int wcc_cnt = 0;
+			for (int p = 1; p <= entityCnt; p++)
+				if (Utils::getParent(p, parent) == p)
+					wcc_cnt++;
+			arr.push_back({wcc_cnt * edge_weight[IDToPredicate[preID]], preID});
 		}
 	}
 
 	sort(arr.begin(), arr.end());
-	/*put as many properties as possbile into the internal properties*/
-
-	// for(auto it = arr.begin(); it != arr.end(); ++ it)
-	// 	cout << it->first << " " << it->second << endl;
-
+	// put as many properties as possbile into the internal properties
 	for (int i = arr.size() - 1; i >= 0; i--)
-	//for(int i=0;i < arr.size();i++)
 	{
 		int preID = arr[i].second;
-		// cout<<IDToPredicate[preID]<<" "<<arr[i].first<<endl;
-		for (int p = 0; p < edge[preID].size(); ++ p)
+		for (int p = 0; p < edge[preID].size(); p++)
 		{
 
 			int A = edge[preID][p].first, B = edge[preID][p].second;
-			int parentA = getParent(A, FA), parentB = getParent(B, FA);
+			int parentA = Utils::getParent(A, FA), parentB = Utils::getParent(B, FA);
 
 			if (RANK[parentA] < RANK[parentB])
 				swap(parentA, parentB);
@@ -777,7 +751,6 @@ void graph::greed3()
 				SONCNT[parentA] += SONCNT[parentB];
 				RANK[parentA] = max(RANK[parentA], RANK[parentB] + 1);
 
-				//cost(preID) > limit 选不了了
 				if (SONCNT[parentA] > limit)
 				{
 					invalid[preID] = 1;
@@ -788,70 +761,88 @@ void graph::greed3()
 		if (invalid[preID])
 			break;
 		choice[preID] = 1;
+		internalAddOrder.push_back(preID);
 	}
 
 	int crossEdge = 0;
-	// for(int preID=1;preID<=preType;preID++)
-	// 	if(choice[preID]==0)cout<<preID<<"	"<<IDToPredicate[preID]<<endl,crossEdge++;
+	for (int preID = 1; preID <= svCnt; preID++)
+		if (choice[preID] == 0)
+			cout << preID << "	" << IDToPredicate[preID] << endl, crossEdge++;
 	printf("crossEdge: %d\n", crossEdge);
-	printf("\n");
+
+	puts("internal choosing order: ");
+	for (auto preid : internalAddOrder)		cout << preid << " : " << IDToPredicate[preid] << endl;
+	puts("\n==========================================================================================\n");
 	unionBlock(choice, part);
 }
 
 void graph::unionBlock(vector<int> &choice, int goal)
 {
 	cout << "unionBlock: " << endl;
-	vector<int> parent(entityCnt + 1);
+	WCCParentVec = vector<int>(entityCnt + 1, 0);
 	for (int p = 1; p <= entityCnt; ++ p)
-		parent[p] = p;
-	vector<int> rank = vector<int>(entityCnt + 1, 0);
+		WCCParentVec[p] = p;
+	WCCRankVec = vector<int>(entityCnt + 1, 0);
+	WCCSizeVec = vector<int>(entityCnt + 1, 1);
+
 	for (int preID = 1; preID <= svCnt; ++ preID)
+	{
 		if (choice[preID] == 1)
 		{
+			// cout << IDToPredicate[preID] << endl;
 			for (int p = 0; p < edge[preID].size(); ++ p)
 			{
-				int parentA = getParent(edge[preID][p].first, parent);
-				int parentB = getParent(edge[preID][p].second, parent);
-				if (rank[parentA] < rank[parentB])
+				int parentA = Utils::getParent(edge[preID][p].first, WCCParentVec);
+				int parentB = Utils::getParent(edge[preID][p].second, WCCParentVec);
+				if (WCCRankVec[parentA] < WCCRankVec[parentB])
 					swap(parentA, parentB);
 				if (parentA != parentB)
 				{
-					rank[parentA] = max(rank[parentA], rank[parentB] + 1);
-					parent[parentB] = parentA;
+					WCCRankVec[parentA] = max(WCCRankVec[parentA], WCCRankVec[parentB] + 1);
+					WCCParentVec[parentB] = parentA;
+					WCCSizeVec[parentA] += WCCSizeVec[parentB];
 					entityTriples[parentA] += entityTriples[parentB];
 				}
 			}
 		}
+	}
+
+	// mergeWCC();
+
+	// compare key: triples contained in entity p
 	vector<pair<int, int>> block;
 	int blockNum = 0;
 	for (int p = 1; p <= entityCnt; ++ p)
-		if (p == getParent(p, parent))
-			block.push_back({entityTriples[p], p}), ++blockNum;
+		if (p == Utils::getParent(p, WCCParentVec))
+			block.push_back({entityTriples[p], p}), ++ blockNum;
 	printf("blockNum: %d\n", blockNum);
 
 	sort(block.begin(), block.end());
 
-	//小根堆	<entityTriples, 加入序号>
+	// use min heap to make sure the balance between parts
 	priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> Q;
 
 	for (int i = 1; i <= goal; ++ i)
 		Q.push({0, i});
-	vector<int> blockTogoal(entityCnt + 1, 0);
-	for (int i = block.size() - 1; i >= 0; i--)
-	{
-		pair<int, int> tmp = Q.top();
-		Q.pop();
-		tmp.first += block[i].first;
 
-		//tmp = make_pair(block[i].first, 加入序号)
-		blockTogoal[block[i].second] = tmp.second;
-		Q.push(tmp);
+	// key: WCCRoot ID  value: partition ID
+	vector<int> blockTogoal(entityCnt + 1, 0);
+	for (int i = block.size() - 1; i >= 0; -- i)
+	{
+		// top = {triples contained in entity p, partition ID}
+		pair<int, int> top = Q.top();
+		Q.pop();
+		top.first += block[i].first;
+
+		// blockTogoal[WCCRoot] = partition ID
+		blockTogoal[block[i].second] = top.second;
+		Q.push(top);
 	}
 
-	//相当于给block加了序号
 	while (!Q.empty())
 	{
-		printf("%d %d\n", Q.top().first, Q.top().second);
+		// all triples count, partition ID
+		printf("triple count of all entity in part %d before deduplicated: %d\n", Q.top().second - 1, Q.top().first);
 		Q.pop();
 	}
 
@@ -864,24 +855,26 @@ void graph::unionBlock(vector<int> &choice, int goal)
 	for (int pos, p = 1; p <= entityCnt; ++ p)
 	{
 		string t = IDToEntity[p];
-		pos = blockTogoal[getParent(p, parent)];
+		pos = blockTogoal[Utils::getParent(p, WCCParentVec)];
 		int groupID = pos - 1;
 		group[t] = groupID;
 		outFile << t << "	" << groupID << endl;
 		CNT[pos]++;
 	}
 	outFile.close();
-	printf("\n");
+	puts("");
 	for (int i = 1; i <= goal; ++ i)
-		printf("%d %d\n", i, CNT[i]);
+		printf("entity count of part %d : %d\n", i, CNT[i]);
 
 	// ofstream File("/opt/workspace/PCP/"+RDF+"crossingEdges.txt");
 	ofstream File(RDF + "crossingEdges.txt");
 	File << "Predicate"
 		 << "\t"
-		 << "isCrossEgde"
+		 << "Edge Count"
 		 << "\t"
-		 << "weight" << endl
+		 << "IsCrossEgde"
+		 << "\t"
+		 << "Weight" << endl
 		 << endl;
 	for (unordered_map<string, int>::iterator it = edge_cnt.begin(); it != edge_cnt.end(); ++ it)
 	{
@@ -894,7 +887,7 @@ void graph::unionBlock(vector<int> &choice, int goal)
 		File << endl;
 	}
 
-	File << endl;
+	File << "\n==========================================================================================\n" << endl;
 	for (int i = preType + 1; i <= svCnt; ++i)
 	{
 		File << IDToPredicate[i] << "\t" << edge[i].size() << "\t";
@@ -907,71 +900,13 @@ void graph::unionBlock(vector<int> &choice, int goal)
 	// update();
 }
 
-void graph::metis(string txt_name, string tag)
-{
-	ifstream in(txt_name.data());
-	string str;
-	entityCnt = 0;
-	vector<vector<int>> EDGE;
-	EDGE.push_back(vector<int>());
-	triples = 0;
-	int edge_count = 0;
-	while (getline(in, str))
-	{
-		triples++;
-		if (triples % 10000 == 0)
-			cout << "loading triples : " << triples << endl;
-		str.resize(str.length() - 2);
-		vector<string> s;
-		s = split(str, tag);
-		predicate.insert(s[1]);
-		for (int i = 0; i < 3; i += 2)
-			if ((s[i][0] == '<' || s[i][0] == '_') && entityToID.count(s[i]) == 0)
-			{
-				entityToID[s[i]] = ++entityCnt;
-				IDToEntity.push_back(s[i]);
-				EDGE.push_back(vector<int>());
-			}
-		if (entityToID.count(s[0]) != 0 && entityToID.count(s[2]) != 0)
-		{
-			EDGE[entityToID[s[0]]].push_back(entityToID[s[2]]);
-			EDGE[entityToID[s[2]]].push_back(entityToID[s[0]]);
-			edge_count++;
-		}
-	}
-
-	ofstream out((RDF + ".tmp").data());
-	out << entityCnt << " " << edge_count << endl;
-	for (int i = 1; i < EDGE.size(); ++ i)
-	{
-		for (int j = 0; j < EDGE[i].size(); ++ j)
-			out << EDGE[i][j] << " ";
-		out << endl;
-	}
-
-	stringstream cmd_ss;
-	cmd_ss << "./gpmetis " << RDF << ".tmp " << part;
-	cout << cmd_ss.str().c_str() << endl;
-	system(cmd_ss.str().c_str());
-	stringstream metis_ss;
-	metis_ss << "./" << RDF << ".tmp.part." << part;
-	cout << metis_ss.str().c_str() << endl;
-	ifstream In(metis_ss.str().c_str());
-	ofstream Out(("./" + RDF + "METISInternalPoints.txt").data());
-	int idx = 1;
-	while (getline(In, str))
-	{
-		Out << IDToEntity[idx++] << "\t" << atoi(str.c_str()) << endl;
-	}
-}
-
 void graph::partition(string txt_name, string tag, string out_file)
 {
 	string line;
-	ifstream readGraph(txt_name.data());
+	ifstream readGraph(txt_name);
 	triples = 0;
 
-	vector<pair<pair<string, string>, string>> tmp;
+	vector<pair<pair<int, int>, string>> tmp;
 	for (int i = 1; i <= part; ++i)
 		edgeGroup.push_back(tmp);
 
@@ -980,32 +915,49 @@ void graph::partition(string txt_name, string tag, string out_file)
 		triples++;
 		if (triples % 10000 == 0)
 			cout << "grouping triples : " << triples << endl;
-		line.resize(line.length() - 2);
+		// line.resize(line.length() - 2);
 		vector<string> s;
-		s = split(line, tag);
-
+		s = Utils::split(line, tag);
 		int u = entityToID[s[0]], v = entityToID[s[2]], p = predicateToID[s[1]];
-		// // if(u == 0)	continue;
+		// if(u == 0)	continue;
 		int uID = group[s[0]], vID = group[s[2]];
-		// cout << triples << ":" << u << " " << v << " ";
-		edgeGroup[uID].push_back({{s[0], s[2]}, s[1]});
+		// cout << triples << ":" << u << " " << v << " " << uID << ' ' << vID << ' ' << s[0] << endl;
+        int new_v;
+		if (v == 0)
+			new_v = entityCnt + strEntityToID[s[2]];
+		else
+			new_v = v;
+		edgeGroup[uID].push_back({{u, new_v}, s[1]});
 		if (uID != vID && v != 0)
-			edgeGroup[vID].push_back({{s[0], s[2]}, s[1]});
+			edgeGroup[vID].push_back({{u, new_v}, s[1]});
 	}
 
 	int partCnt = part;
 
+	cout << "entityCnt : " << entityCnt << endl;
+	cout << "strEntity : " << strEntityToID.size() << endl;
+	cout << "predicate : " << predicate.size() << endl;
 	for (int i = 0; i < partCnt; ++i)
 	{
 		string SubGraphName = out_file + to_string(i) + ".txt";
 		ofstream out(SubGraphName);
 		int groupSize = edgeGroup[i].size();
-		cout << groupSize << endl;
+		cout << "triples count in part " << i << " is :" << groupSize << endl;
 		for (int j = 0; j < groupSize; ++j)
-			out << edgeGroup[i][j].first.first << " " << edgeGroup[i][j].second << " " << edgeGroup[i][j].first.second << " ." << endl;
+		{
+			string s = IDToEntity[edgeGroup[i][j].first.first], p = edgeGroup[i][j].second, o;
+			if (edgeGroup[i][j].first.second > entityCnt)	o = IDToStrEntity[edgeGroup[i][j].first.second - entityCnt - 1];
+			else						   					o = IDToEntity[edgeGroup[i][j].first.second];
+			out << s << " " << p << " " << o << " ." << endl;
+			// cout << s << " " << p << " " << o << " ." << endl;
+			// cout << s << " " << p << " " << edgeGroup[i][j].first.second << " ." << endl;
+		}
 		out.close();
 	}
 	// cout << "ID : " << entityToID[""] << endl;
+	// cout << strEntityToID["\"A\"@en"] << endl;
+	// cout << entityToID["<http://dbpedia.org/resource/Category:1809_births>"] << endl;
+	// cout << entityToID["<http://dbpedia.org/resource/Category:1865_deaths>"] << endl;
 }
 
 void graph::getFileList(string template_path, string result_path)
@@ -1050,45 +1002,56 @@ void graph::getFileList(string template_path, string result_path)
 
 void graph::readQueryResult(string template_path, string result_path, string tag)
 {
-	//initialize patternQueryNode
+	vector<vector<string>> patternQueryNode;
+	vector<string> s, s0, s1;
+
+	// query result -> "\t"
+
+	// initialize patternQueryNode
 	vector<string> tmp;
 	for (int i = 0; i < queryCnt + 1; ++i)
 		patternQueryNode.push_back(tmp);
 	validResultCnt = 0;
-	// mkdir("./tmp/");
+	// mkdir("./tmp/", 0775);
 
 	string str, t;
-	size_t pos = 0, pos_v0 = 0;
+	size_t pos = 0;
+	int currPatternID;
 	int id;
-
+	//	puts("============================");
 	for (auto &filename : query_result)
 	{
+		string multiPreName = "multiPre_" + filename;
+		predicateToID[multiPreName] = IDToPredicate.size();
+		currPatternID = IDToPredicate.size() - preType;
+
 		id = queryID[filename];
 
-		ifstream in_result((result_path + "/" + filename).data());
+		ifstream in_result((result_path + "/" + filename));
 
 		getline(in_result, str);
 		if (str == "")
 			continue;
-		++validResultCnt;
-
+		++ validResultCnt;
 		stringstream ss(str);
 		while (ss >> t)
 			patternQueryNode[id].push_back(t);
 
-		ofstream out(("./tmp/" + filename + "_tmp.txt").data());
+		ofstream out(("./tmp/" + filename + "_tmp.txt"));
 		//先读结果
 
 		vector<pair<int, int>> resultTriples;
 
 		while (getline(in_result, str))
 		{
+			if (str == "")	break;
 			int lineLen = str.size();
-			s = split(str, tag);
+
+			s = Utils::split(str, "\t");
 
 			//匹配到查询pattern
 
-			ifstream in_template((template_path + "/" + filename).data());
+			ifstream in_template((template_path + "/" + filename));
 			getline(in_template, str);
 			//逐行替换
 			while (getline(in_template, str))
@@ -1096,9 +1059,10 @@ void graph::readQueryResult(string template_path, string result_path, string tag
 				if (str == "}")
 					break;
 
-				s0 = split(str, "\t");
+				s0 = Utils::split(str, "\t");
 
 				int vCnt = patternQueryNode[id].size();
+
 				for (int i = 0; i < vCnt; ++i)
 				{
 					string v = patternQueryNode[id][i];
@@ -1108,13 +1072,20 @@ void graph::readQueryResult(string template_path, string result_path, string tag
 						str = str.replace(pos, v.size(), s[i]);
 					}
 				}
+
 				str.resize(str.size() - 3);
 				out << str << endl;
-
-				s1 = split(str, "\t");
+				s1 = Utils::split(str, "\t");
 				int a = entityToID[s1[0]], b = entityToID[s1[2]];
+				out << a << "<==================>" << b << endl;
+				// cout << IDToEntity[a] << ' ' << IDToEntity[b] << endl;
 				if (a && b)
+				{
+					// if (filename == "p3.txt")	cout << IDToEntity[a] << ' ' << IDToEntity[b] << endl;
 					resultTriples.push_back({a, b});
+					// containPattern[a][currPatternID] = 1;
+					// containPattern[b][currPatternID] = 1;
+				}
 			}
 			in_template.close();
 		}
@@ -1122,11 +1093,6 @@ void graph::readQueryResult(string template_path, string result_path, string tag
 		out.close();
 		edge.push_back(resultTriples);
 		IDToPredicate.push_back("multiPre_" + filename);
+		cout << multiPreName << " : " << currPatternID << ' ' << resultTriples.size() << endl;
 	}
-
-	// puts("-----------------------------------");
-	// for (int i = 1; i <= validResultCnt; ++ i)
-	// {
-	// 	cout << i << "'s size is : " << edgeOfMultiPre[i].size() << endl;
-	// }
 }

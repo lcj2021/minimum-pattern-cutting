@@ -15,7 +15,11 @@
 #include <unistd.h>
 #include <dirent.h>
 
+
 using namespace std;
+typedef pair<int, int> PII;
+typedef pair<double, int> PDI;
+#define MAX_PROPERTY  150
 
 class graph
 {
@@ -54,20 +58,27 @@ private:
 	set<string> predicate;
 	unordered_map<string, int> entityToID;
 	vector<string> IDToEntity;
+	unordered_map<string, int> strEntityToID;
+	vector<string> IDToStrEntity;
 	unordered_map<string, int> predicateToID;
 	vector<string> IDToPredicate;
 	vector<vector<pair<int, int>>> edge;
 	vector<pair<int, string>> otherEdge;
 
-	vector<bitset<32>> containPattern;
+	vector<bitset<MAX_PROPERTY>> containPattern;
 
-	// 
+	// coarseningPoint[svID]: the disjoint forest of predicate[svID]
+	// key: vertex			value: the root of vertex
 	vector<unordered_map<int, int>> coarseningPoint;
 
 	// key: entityID		value: the count of triples containing entityID
 	vector<int> entityTriples;
 
-	vector<int> parentVec;
+	vector<int> WCCParentVec;
+	vector<int> WCCSizeVec;
+	vector<int> WCCRankVec;
+	vector<int> internalPre;
+	vector<int> internalAddOrder;
 
 	unordered_map<string, int> edge_cnt; // edge_cnt[IDToPredicate[i]] == edge[i].size()
 
@@ -75,14 +86,16 @@ private:
 	// key: the property	value: the count of the property
 	unordered_map<string, int> edge_weight;
 
+	// key: entityID			value: the group ID it belongs to
 	unordered_map<string, int> group;
-	vector<vector<pair<pair<string, string>, string>>> edgeGroup;
+	vector<vector<pair<pair<int, int>, string>>> edgeGroup;
 
 	vector<bool> invalid;
 	long long triples;
 
 	// entityCnt : entity count
 	long long entityCnt;
+	long long strEntityCnt;
 
 	// predicate count
 	int preType;
@@ -101,8 +114,5 @@ private:
 	int validResultCnt;
 
 	//read result of query
-	vector<vector<string>> patternQueryNode;
-	vector<string> s;
-	vector<string> s0;
-	vector<string> s1;
+
 };

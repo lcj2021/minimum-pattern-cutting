@@ -34,8 +34,17 @@
 # directory
 /origin_query
 /warpInput
-/.vscode
+/tmp
+/dataset
+/test*
+/.graph*
 
 # Test data
-MPC_watdiv*.txt
+MPC_watdiv*
+*.txt
 *.nt
+*.tar.gz
+
+dbpedia2014*
+
+lcj*
